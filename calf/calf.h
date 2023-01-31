@@ -127,11 +127,56 @@ typedef CalfValue (*CalfFuncCall)(CalfScript *, CalfValue *, int);
 
 /*
  *  PUBLIC CALF API
+ *  ---------------
  */
+
+/*
+ *  VALUE API
+ */
+
+typedef CalfValue (CalfInterfaceFunc)(CalfValue *, int);
+
+
+CalfValue calf_value_from_int(int int_value) {
+    CalfValue value;
+    value.type = CALF_VALUE_TYPE_INT;
+    value.int_value = int_value;
+    return value;
+}
+
+CalfValue calf_value_from_float(float float_value) {
+    CalfValue value;
+    value.type = CALF_VALUE_TYPE_FLOAT;
+    value.float_value = float_value;
+    return value;
+}
+
+CalfValue calf_value_from_c_string(char *str) {
+    CalfValue value;
+    value.type = CALF_VALUE_TYPE_STR;
+    value.str_value = str;
+    return value;
+}
+
+CalfValue calf_value_from_user_value(CalfUserObject *obj) {
+    CalfValue value;
+    value.type = CALF_VALUE_TYPE_USER_OBJ;
+    value.user_object_value = obj;
+    return value;
+}
+
+CalfValue calf_value_from_interface_function(CalfInterfaceFunc func) {
+    CalfValue value;
+    value.type = CALF_VALUE_TYPE_C_FUNC;
+    value.func_value = (CalfFunc *) func;
+    return value;
+}
+
 
 /*
  * Init a CalfScript structure. This called is required before any script can be called.
  */
+
 bool calf_init(CalfScript *script);
 
 /*
@@ -143,12 +188,14 @@ calf_script_set_user_object(CalfScript *script, char *name, void *obj, CalfGetAt
 /*
  * Load a module from text.
  */
+
 CalfModule *calf_load_module(CalfScript *script, char *text);
 
 /*
  * Api function to call a script function from C. It's NOT to be called internally by the interpreter
- * since it resets the script heap allocator
+ * since it resets the script stack allocator
  */
+
 CalfValue calf_execute(CalfScript *script, CalfModule *file, char *func_name, CalfValue *args, int args_count);
 
 #endif //CALFSCRIPT_CALF_H
