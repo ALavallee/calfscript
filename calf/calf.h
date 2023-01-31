@@ -137,6 +137,12 @@ typedef CalfValue (*CalfFuncCall)(CalfScript *, CalfValue *, int);
 
 typedef CalfValue (CalfInterfaceFunc)(CalfValue *, int);
 
+static CalfValue calf_value_from_bool(bool bool_value) {
+    CalfValue value;
+    value.type = CALF_VALUE_TYPE_BOOL;
+    value.bool_value = bool_value;
+    return value;
+}
 
 static CalfValue calf_value_from_int(int int_value) {
     CalfValue value;
@@ -171,6 +177,24 @@ static CalfValue calf_value_from_interface_function(CalfInterfaceFunc func) {
     value.type = CALF_VALUE_TYPE_C_FUNC;
     value.func_value = (CalfFunc *) func;
     return value;
+}
+
+static bool calf_value_to_bool(CalfValue value) {
+    switch (value.type) {
+
+        case CALF_VALUE_TYPE_INT:
+            return (bool) value.int_value;
+
+        case CALF_VALUE_TYPE_FLOAT:
+            return (float) value.float_value;
+
+        case CALF_VALUE_TYPE_BOOL:
+            return value.bool_value;
+
+        default:
+            return false;
+
+    }
 }
 
 static int calf_value_to_int(CalfValue value) {
