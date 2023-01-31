@@ -41,7 +41,7 @@ fn fib(n)
 ```
 
 # How to setup 🔨
-The most common way to build it is probably to simply integrates the files into your project / build process. It's only two files to integrate (calf.h and calf.c).
+The most common way to build it is probably to simply integrate the files into your project / build process. It's only two files to add (calf.h and calf.c).
 
 # Implementation details ⚙️
 For the parsing and byte code generation, CalfScript is doing the lexer / parsing / codegen all at the same time. It allows very efficient compilation of the code into bytecode.

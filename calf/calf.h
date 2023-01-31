@@ -126,8 +126,9 @@ typedef CalfValue (*CalfFuncCall)(CalfScript *, CalfValue *, int);
 
 
 /*
- *  PUBLIC CALF API
- *  ---------------
+ *
+ *  PUBLIC CALF API --------
+ *
  */
 
 /*
@@ -137,39 +138,82 @@ typedef CalfValue (*CalfFuncCall)(CalfScript *, CalfValue *, int);
 typedef CalfValue (CalfInterfaceFunc)(CalfValue *, int);
 
 
-CalfValue calf_value_from_int(int int_value) {
+static CalfValue calf_value_from_int(int int_value) {
     CalfValue value;
     value.type = CALF_VALUE_TYPE_INT;
     value.int_value = int_value;
     return value;
 }
 
-CalfValue calf_value_from_float(float float_value) {
+static CalfValue calf_value_from_float(float float_value) {
     CalfValue value;
     value.type = CALF_VALUE_TYPE_FLOAT;
     value.float_value = float_value;
     return value;
 }
 
-CalfValue calf_value_from_c_string(char *str) {
+static CalfValue calf_value_from_c_string(char *str) {
     CalfValue value;
     value.type = CALF_VALUE_TYPE_STR;
     value.str_value = str;
     return value;
 }
 
-CalfValue calf_value_from_user_value(CalfUserObject *obj) {
+static CalfValue calf_value_from_user_value(CalfUserObject *obj) {
     CalfValue value;
     value.type = CALF_VALUE_TYPE_USER_OBJ;
     value.user_object_value = obj;
     return value;
 }
 
-CalfValue calf_value_from_interface_function(CalfInterfaceFunc func) {
+static CalfValue calf_value_from_interface_function(CalfInterfaceFunc func) {
     CalfValue value;
     value.type = CALF_VALUE_TYPE_C_FUNC;
     value.func_value = (CalfFunc *) func;
     return value;
+}
+
+static int calf_value_to_int(CalfValue value) {
+    switch (value.type) {
+
+        case CALF_VALUE_TYPE_INT:
+            return value.int_value;
+
+        case CALF_VALUE_TYPE_FLOAT:
+            return (int) value.int_value;
+
+        case CALF_VALUE_TYPE_BOOL:
+            return (int) value.bool_value;
+
+        default:
+            return -1;
+    }
+}
+
+static float calf_value_to_float(CalfValue value) {
+    switch (value.type) {
+
+        case CALF_VALUE_TYPE_INT:
+            return (float) value.int_value;
+
+        case CALF_VALUE_TYPE_FLOAT:
+            return value.float_value;
+
+        default:
+            return 0.f;
+
+    }
+}
+
+static char *calf_value_to_char(CalfValue value) {
+    switch (value.type) {
+
+        case CALF_VALUE_TYPE_STR:
+            return value.str_value;
+
+        default:
+            return "";
+    }
 }
 
 
