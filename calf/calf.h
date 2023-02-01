@@ -137,11 +137,25 @@ typedef CalfValue (*CalfFuncCall)(CalfScript *, CalfValue *, int);
 
 typedef CalfValue (CalfInterfaceFunc)(CalfValue *, int);
 
+static CalfValue calf_value_none() {
+    CalfValue value;
+    value.type = CALF_VALUE_TYPE_NONE;
+    return value;
+}
+
 static CalfValue calf_value_from_bool(bool bool_value) {
     CalfValue value;
     value.type = CALF_VALUE_TYPE_BOOL;
     value.bool_value = bool_value;
     return value;
+}
+
+static CalfValue calf_value_true() {
+    return calf_value_from_bool(true);
+}
+
+static CalfValue calf_value_false() {
+    return calf_value_from_bool(false);
 }
 
 static CalfValue calf_value_from_int(int int_value) {
@@ -238,6 +252,38 @@ static char *calf_value_to_char(CalfValue value) {
         default:
             return "";
     }
+}
+
+static bool calf_value_is_none(CalfValue value) {
+    return value.type == CALF_VALUE_TYPE_NONE;
+}
+
+static bool calf_value_is_bool(CalfValue value) {
+    return value.type == CALF_VALUE_TYPE_BOOL;
+}
+
+static bool calf_value_is_int(CalfValue value) {
+    return value.type == CALF_VALUE_TYPE_INT;
+}
+
+static bool calf_value_is_float(CalfValue value) {
+    return value.type == CALF_VALUE_TYPE_FLOAT;
+}
+
+static bool calf_value_is_string(CalfValue value) {
+    return value.type == CALF_VALUE_TYPE_STR;
+}
+
+static bool calf_value_is_func(CalfValue value) {
+    return value.type == CALF_VALUE_TYPE_FUNC;
+}
+
+static bool calf_value_is_interface_func(CalfValue value) {
+    return value.type == CALF_VALUE_TYPE_C_FUNC;
+}
+
+static bool calf_value_is_user_obj(CalfValue value) {
+    return value.type == CALF_VALUE_TYPE_USER_OBJ;
 }
 
 
