@@ -158,6 +158,9 @@ static char *calf_value_type_to_str(CalfValue value) {
 
         case CALF_VALUE_TYPE_USER_OBJ:
             return "user object";
+
+        default:
+            return "";
     }
 }
 
@@ -605,7 +608,7 @@ static bool calf_parse_followed_expr(CalfParser *parser) {
     char *var_name = calf_lex_id(parser);
     if (var_name) {
 
-        //search if the local can be a local one so we can used the specific opcodes for it
+        //search if the var can be a local, so we can use the specific opcodes for it
         int local_id = -1;
         for (int i = 0; i < parser->locals.size; ++i) {
             if (strcmp(var_name, parser->locals.data[i]) == 0)
@@ -841,7 +844,7 @@ static void calf_parse_if(CalfParser *parser) {
             calf_parse_func_content(parser);
             byte_writer_int32(&parser->writer, CALF_OP_JMP);
             //create jump that goes after the if - else statement
-            addr_block_end[addr_blocks_count++] = byte_writer_int32(&parser->writer, 0);;
+            addr_block_end[addr_blocks_count++] = byte_writer_int32(&parser->writer, 0);
         }
 
         parser->writer.memory[false_addr] = parser->writer.size;
@@ -1232,9 +1235,9 @@ static CalfValue calf_execute_op(CalfScript *script, CalfExec *exec, CalfFunc *f
                 break;
 
             case CALF_OP_CALL: {
-                const int args_count = *(++opcode);
-                CalfValue all_args[args_count];
-                for (int i = 0; i < args_count; ++i) {
+                const int args_count_call = *(++opcode);
+                CalfValue all_args[args_count_call];
+                for (int i = 0; i < args_count_call; ++i) {
                     all_args[i] = GET();
                     POP();
                 }
@@ -1245,9 +1248,10 @@ static CalfValue calf_execute_op(CalfScript *script, CalfExec *exec, CalfFunc *f
                 if (func_to_call.type == CALF_VALUE_TYPE_FUNC) {
                     func_result = calf_execute_func(script, &func->module->globals, func_to_call.func_value,
                                                     (CalfValue *) &all_args,
-                                                    args_count);
+                                                    args_count_call);
                 } else if (func_to_call.type == CALF_VALUE_TYPE_C_FUNC) {
-                    func_result = ((CalfFuncCall) func_to_call.func_value)(script, (CalfValue *) &all_args, args_count);
+                    func_result = ((CalfFuncCall) func_to_call.func_value)(script, (CalfValue *) &all_args,
+                                                                           args_count_call);
                 } else {
                     return calf_exec_raise_error(script, func->name, "Type '%.*s' can't be called",
                                                  calf_value_type_to_str(func_to_call));
