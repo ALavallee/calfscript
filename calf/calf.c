@@ -349,10 +349,8 @@ static int calf_get_or_add_str_to_array(CalfMap *strings_map, CalfArray *strings
  */
 
 typedef struct {
-    int current_line;
     int current_char;
-    char **lines;
-    int lines_count;
+    char *code;
     char *current_func_name;
 
     bool has_error;
@@ -365,46 +363,44 @@ typedef struct {
 
 //Lexer structure
 
-static char **calf_split_lines(char *text, int *lines_count) {
-    CalfArray array = {0};
-    char *token = strtok(text, "\n");
-    while (token != NULL) {
-        array_add(&array, token);
-        token = strtok(NULL, "\n");
-    }
-
-    *lines_count = array.size;
-    return (char **) array.data;
-}
-
 static void calf_parser_raise_error(char *error, CalfParser *parser) {
     if (!parser->has_error) { //If there is already an error, don't overwrite
         parser->has_error = true;
         parser->error.message = error;
-        parser->error.line = parser->current_line;
         parser->error.row = parser->current_char;
     }
 }
 
-static void calf_lex_skip_white_lines(CalfParser *parser) {
-    const char *current_line = parser->lines[parser->current_line];
-    while (current_line[parser->current_char] == ' ' || current_line[parser->current_char] == '\t' ||
-           current_line[parser->current_char] == '\n') {
+static void calf_lex_skip_comment_line(CalfParser *parser) {
+    const char *current_line = parser->code;
+    while (current_line[parser->current_char] != '\n') {
         ++parser->current_char;
+        if (parser->code[parser->current_char] == 0) {
+            break;
+        }
+    }
+}
+
+static void calf_lex_skip_white_lines(CalfParser *parser) {
+    char *current_line = parser->code;
+    while (current_line[parser->current_char] == ' ' || current_line[parser->current_char] == '\t' ||
+           current_line[parser->current_char] == '\n' || current_line[parser->current_char] == '#') {
+        if (current_line[parser->current_char] == '#') {
+            ++parser->current_char;
+            calf_lex_skip_comment_line(parser);
+        } else {
+            ++parser->current_char;
+        }
     }
 }
 
 static bool calf_lex_at_end(CalfParser *parser) {
-    if (parser->current_line == parser->lines_count - 1) {
-        return parser->current_char >= strlen(parser->lines[parser->current_line]);
-    }
-
-    return false;
+    return parser->code[parser->current_char] == 0;
 }
 
 static char *calf_lex_id(CalfParser *parser) {
     calf_lex_skip_white_lines(parser);
-    const char *current_line = parser->lines[parser->current_line];
+    const char *current_line = parser->code;
     const int start_index = parser->current_char;
     while (isalpha(current_line[parser->current_char]) ||
            (isdigit(current_line[parser->current_char]) && (parser->current_char - start_index)) ||
@@ -426,7 +422,7 @@ static char *calf_lex_id(CalfParser *parser) {
 
 static bool calf_lex_specific(CalfParser *parser, char *specific) {
     calf_lex_skip_white_lines(parser);
-    const char *current_line = parser->lines[parser->current_line];
+    const char *current_line = parser->code;
     const int start_index = parser->current_char;
     int spec_size = (int) strlen(specific);
     for (int i = 0; i < spec_size; ++i) {
@@ -456,7 +452,7 @@ static bool calf_lex_specific(CalfParser *parser, char *specific) {
 
 static bool calf_lex_integer(CalfParser *parser, int *value) {
     calf_lex_skip_white_lines(parser);
-    const char *current_line = parser->lines[parser->current_line];
+    const char *current_line = parser->code;
     const int start_index = parser->current_char;
     while (isdigit(current_line[parser->current_char])) {
         ++parser->current_char;
@@ -478,7 +474,7 @@ static bool calf_lex_integer(CalfParser *parser, int *value) {
 static float calf_lex_float(CalfParser *parser, float *value) {
     calf_lex_skip_white_lines(parser);
 
-    const char *current_line = parser->lines[parser->current_line];
+    const char *current_line = parser->code;
     const int start_index = parser->current_char;
     bool found_dot = false;
     while (isdigit(current_line[parser->current_char]) || current_line[parser->current_char] == '.') {
@@ -507,7 +503,7 @@ static float calf_lex_float(CalfParser *parser, float *value) {
 
 static bool calf_lex_str(CalfParser *parser, char **text) {
     calf_lex_skip_white_lines(parser);
-    const char *current_line = parser->lines[parser->current_line];
+    const char *current_line = parser->code;
     const int start_index = parser->current_char;
     if (current_line[start_index] == '"') {
         while (current_line[parser->current_char] != '"') {
@@ -535,24 +531,11 @@ static bool calf_lex_str(CalfParser *parser, char **text) {
 //Lex eq has his own function because using specific thinks '==' is a valid '=' expr
 static bool calf_lex_specific_eq(CalfParser *parser) {
     calf_lex_skip_white_lines(parser);
-    const char *current_line = parser->lines[parser->current_line];
+    const char *current_line = parser->code;
     const int start_index = parser->current_char;
     if (current_line[start_index] == '=' && current_line[start_index + 1] != '=') {
         ++parser->current_char;
         return true;
-    }
-
-    return false;
-}
-
-static bool calf_lex_next_line(CalfParser *parser) {
-    calf_lex_skip_white_lines(parser);
-    if (parser->lines[parser->current_line][parser->current_char] == 0) {
-        if (parser->current_line + 1 < parser->lines_count) {
-            ++parser->current_line;
-            parser->current_char = 0;
-            return true;
-        }
     }
 
     return false;
@@ -962,7 +945,7 @@ CalfFunc calf_parse_func(CalfModule *file, CalfParser *parser, int *found) {
 
 static void calf_parse_file(CalfScript *script, CalfModule *file, char *text) {
     CalfParser parser = {0};
-    parser.lines = calf_split_lines(text, &parser.lines_count);
+    parser.code = text;
     parser.strings_array = &script->strings_array;
     parser.strings_map = &script->strings_map;
 
@@ -1063,6 +1046,12 @@ static inline CalfValue calf_int_op(int left, int right, int op) {
         if (right == 0) //to avoid a crash
             result.int_value = 0;
         result.int_value = left / right;
+    } else if (op == CALF_OP_SET_AND) {
+        result.type = CALF_VALUE_TYPE_BOOL;
+        result.bool_value = left && right;
+    } else if (op == CALF_OP_SET_OR) {
+        result.type = CALF_VALUE_TYPE_BOOL;
+        result.bool_value = left && right;
     } else if (op == CALF_OP_SET_EQ) {
         result.type = CALF_VALUE_TYPE_BOOL;
         result.bool_value = left == right;
@@ -1083,6 +1072,11 @@ static inline CalfValue calf_int_op(int left, int right, int op) {
         result.bool_value = left >= right;
     }
 
+    return result;
+}
+
+static inline CalfValue calf_bool_op(bool left, bool right, int op) {
+    CalfValue result = calf_int_op((int) left, (int) right, op);
     return result;
 }
 
@@ -1362,6 +1356,8 @@ static CalfValue calf_execute_op(CalfScript *script, CalfExec *exec, CalfFunc *f
                         return calf_exec_raise_error(script, func->name, "'int' can't operate on '%.*s'",
                                                      calf_value_type_to_str(right_value));
                     }
+                } else if (left_value.type == CALF_VALUE_TYPE_BOOL) {
+                    op_result = calf_bool_op(left_value.bool_value, right_value.bool_value, operation_flag);
                 } else if (left_value.type == CALF_VALUE_TYPE_FLOAT) {
                     if (right_value.type == CALF_VALUE_TYPE_INT) {
                         op_result = calf_float_op(left_value.float_value,
