@@ -38,11 +38,12 @@ typedef enum {
     CALF_VALUE_TYPE_INT = 3,
     CALF_VALUE_TYPE_FLOAT = 4,
     CALF_VALUE_TYPE_STR = 5,
-    CALF_VALUE_TYPE_OBJ = 6,
-    CALF_VALUE_TYPE_FUNC = 7,
-    CALF_VALUE_TYPE_C_FUNC = 8,
-    CALF_VALUE_TYPE_USER_OBJ = 9,
-    CALF_VALUE_TYPE_ERROR = 10
+    CAL_VALUE_TYPE_ARRAY = 6,
+    CALF_VALUE_TYPE_OBJ = 7,
+    CALF_VALUE_TYPE_FUNC = 8,
+    CALF_VALUE_TYPE_C_FUNC = 9,
+    CALF_VALUE_TYPE_USER_OBJ = 10,
+    CALF_VALUE_TYPE_ERROR = 11
 } CalfValueType;
 
 
@@ -60,7 +61,6 @@ typedef struct {
     int size;
     int capacity;
 } CalfArray;
-
 
 typedef struct {
     char *message;

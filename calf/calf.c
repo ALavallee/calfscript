@@ -384,8 +384,9 @@ static void calf_lex_skip_comment_line(CalfParser *parser) {
 static void calf_lex_skip_white_lines(CalfParser *parser) {
     char *current_line = parser->code;
     while (current_line[parser->current_char] == ' ' || current_line[parser->current_char] == '\t' ||
-           current_line[parser->current_char] == '\n' || current_line[parser->current_char] == '#') {
-        if (current_line[parser->current_char] == '#') {
+           current_line[parser->current_char] == '\n' || current_line[parser->current_char] == '#' ||
+           current_line[parser->current_char] == "@") {
+        if (current_line[parser->current_char] == '#' || current_line[parser->current_char] == '@') {
             ++parser->current_char;
             calf_lex_skip_comment_line(parser);
         } else {
