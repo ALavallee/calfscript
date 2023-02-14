@@ -915,27 +915,32 @@ static char **calf_parse_func_args(CalfParser *parser, int *args_count) {
 
 CalfFunc calf_parse_func(CalfModule *file, CalfParser *parser, int *found) {
     CalfFunc func = {0};
-    if (calf_lex_specific(parser, "fn")) {
-        *found = 1;
-        func.name = calf_lex_id(parser);
-        if (func.name != NULL) {
-            parser->current_func_name = func.name;
-            if (calf_lex_specific(parser, "(")) {
-                func.args = calf_parse_func_args(parser, &func.args_count);
-                calf_parse_func_content(parser);
 
-                // if a function ends without return value, it returns null
-                byte_writer_int32(&parser->writer, CALF_OP_CONST_NONE);
-                byte_writer_int32(&parser->writer, CALF_OP_RETURN);
+    calf_lex_skip_white_lines(parser);
 
+    if (!calf_lex_at_end(parser)) {
+        if (calf_lex_specific(parser, "fn")) {
+            *found = 1;
+            func.name = calf_lex_id(parser);
+            if (func.name != NULL) {
+                parser->current_func_name = func.name;
+                if (calf_lex_specific(parser, "(")) {
+                    func.args = calf_parse_func_args(parser, &func.args_count);
+                    calf_parse_func_content(parser);
+
+                    // if a function ends without return value, it returns null
+                    byte_writer_int32(&parser->writer, CALF_OP_CONST_NONE);
+                    byte_writer_int32(&parser->writer, CALF_OP_RETURN);
+
+                } else {
+                    calf_parser_raise_error("'(' expected for function argument", parser);
+                }
             } else {
-                calf_parser_raise_error("'(' expected for function argument", parser);
+                calf_parser_raise_error("function name expected after 'fn'", parser);
             }
         } else {
-            calf_parser_raise_error("function name expected after 'fn'", parser);
+            calf_parser_raise_error("'fn' expected to start a function", parser);
         }
-    } else {
-        calf_parser_raise_error("'fn' expected to start a function", parser);
     }
 
     func.exec_code = parser->writer.memory;
