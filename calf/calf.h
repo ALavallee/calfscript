@@ -297,7 +297,7 @@ bool calf_init(CalfScript *script);
  * Set a user object into the scripts global
  */
 void
-calf_script_set_user_object(CalfScript *script, char *name, void *obj, CalfGetAttrFunc get_attr, CalfSetAttrFunc func);
+calf_script_set_global(CalfScript *script, char *name, void *obj, CalfGetAttrFunc get_attr, CalfSetAttrFunc func);
 
 /*
  * Load a module from text.

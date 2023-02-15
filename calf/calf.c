@@ -989,8 +989,8 @@ bool calf_init(CalfScript *script) {
     return true;
 }
 
-void calf_script_set_user_object(CalfScript *script, char *name, void *obj, CalfGetAttrFunc get_attr,
-                                 CalfSetAttrFunc set_attr) {
+void calf_script_set_global(CalfScript *script, char *name, void *obj, CalfGetAttrFunc get_attr,
+                            CalfSetAttrFunc set_attr) {
     int name_size = strlen(name);
     char *global_name = calf_alloc(name_size);
     strcpy(global_name, name);
