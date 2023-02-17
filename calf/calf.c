@@ -502,11 +502,13 @@ static float calf_lex_float(CalfParser *parser, float *value) {
     return false;
 }
 
+
 static bool calf_lex_str(CalfParser *parser, char **text) {
     calf_lex_skip_white_lines(parser);
     const char *current_line = parser->code;
     const int start_index = parser->current_char;
-    if (current_line[start_index] == '"') {
+    if (current_line[parser->current_char] == '"') {
+        ++parser->current_char;
         while (current_line[parser->current_char] != '"') {
             ++parser->current_char;
             if (current_line[parser->current_char] == 0) {
@@ -514,6 +516,7 @@ static bool calf_lex_str(CalfParser *parser, char **text) {
                 return false;
             }
         }
+        ++parser->current_char;
     }
 
     if (parser->current_char > start_index) {
@@ -648,7 +651,7 @@ static bool calf_parse_followed_expr(CalfParser *parser) {
                     byte_writer_int32(&parser->writer, CALF_OP_LOAD_ATTR);
                 }
                 byte_writer_int32(&parser->writer,
-                                  calf_get_or_add_str_to_array(parser->strings_map, parser->strings_array, var_name));
+                                  calf_get_or_add_str_to_array(parser->strings_map, parser->strings_array, attr_name));
 
                 if (calf_lex_specific(parser, "(")) { // func call
                     calf_parse_func_call(parser);
@@ -865,7 +868,6 @@ static void calf_parse_func_content(CalfParser *parser) {
 
     if (calf_lex_specific(parser, "{")) {
         do {
-
             if (calf_lex_specific(parser, "pass")) { //pass keyword, we skip
             } else if (calf_lex_specific(parser, "return")) {
                 calf_parse_return(parser);
@@ -873,16 +875,13 @@ static void calf_parse_func_content(CalfParser *parser) {
                 calf_parse_if(parser);
             } else if (calf_lex_specific(parser, "while")) {
                 calf_parse_while(parser);
+            } else if (calf_lex_specific(parser, "}")) {
+                parse_func = false;
             } else {
                 if (!calf_parse_expression(parser)) {
                     calf_parser_raise_error("Nothing to do here", parser);
                 }
             }
-
-            if (calf_lex_specific(parser, "}")) {
-                parse_func = false;
-            }
-
         } while (parse_func && !parser->has_error);
     } else {
         calf_parser_raise_error("'{' expected", parser);
@@ -989,22 +988,21 @@ bool calf_init(CalfScript *script) {
     return true;
 }
 
-void calf_script_set_global(CalfScript *script, char *name, void *obj, CalfGetAttrFunc get_attr,
-                            CalfSetAttrFunc set_attr) {
+void calf_script_set_global(CalfScript *script, char *name, CalfValue value) {
     int name_size = strlen(name);
-    char *global_name = calf_alloc(name_size);
+    char *global_name = calf_alloc(name_size + 1);
     strcpy(global_name, name);
 
-    CalfUserObject *user_obj = (CalfUserObject *) calf_alloc(sizeof(CalfUserObject));
-    user_obj->obj = obj;
-    user_obj->get_attr = get_attr;
-    user_obj->set_attr = set_attr;
-
-    CalfValue *global_value = calf_alloc(sizeof(CalfValue));
-    global_value->type = CALF_VALUE_TYPE_USER_OBJ;
-    global_value->user_object_value = user_obj;
+    CalfValue *global_value = (CalfValue *) calf_alloc(sizeof(CalfValue));
+    *global_value = value;
 
     calf_map_set(&script->globals, global_name, name_size, (uintptr_t) global_value);
+}
+
+CalfValue calf_script_get_global(CalfScript *script, char *name) {
+    CalfValue *value;
+    calf_map_get(&script->globals, name, strlen(name), (uintptr_t *) &value);
+    return *value;
 }
 
 CalfModule *calf_load_module(CalfScript *script, char *text) {
@@ -1238,23 +1236,34 @@ static CalfValue calf_execute_op(CalfScript *script, CalfExec *exec, CalfFunc *f
                 const int args_count_call = *(++opcode);
                 CalfValue all_args[args_count_call];
                 for (int i = 0; i < args_count_call; ++i) {
-                    all_args[i] = GET();
+                    all_args[args_count_call - 1 - i] = GET();
                     POP();
                 }
 
                 CalfValue func_to_call = POP_GET();
 
                 CalfValue func_result;
-                if (func_to_call.type == CALF_VALUE_TYPE_FUNC) {
-                    func_result = calf_execute_func(script, &func->module->globals, func_to_call.func_value,
-                                                    (CalfValue *) &all_args,
-                                                    args_count_call);
-                } else if (func_to_call.type == CALF_VALUE_TYPE_C_FUNC) {
-                    func_result = ((CalfFuncCall) func_to_call.func_value)(script, (CalfValue *) &all_args,
-                                                                           args_count_call);
-                } else {
-                    return calf_exec_raise_error(script, func->name, "Type '%.*s' can't be called",
-                                                 calf_value_type_to_str(func_to_call));
+
+                switch (func_to_call.type) {
+
+                    case CALF_VALUE_TYPE_FUNC: {
+                        func_result = calf_execute_func(script, &func->module->globals, func_to_call.func_value,
+                                                        (CalfValue *) &all_args,
+                                                        args_count_call);
+                    }
+                        break;
+
+                    case CALF_VALUE_TYPE_C_FUNC: {
+                        func_result = ((CalfFuncCall) func_to_call.func_value)(script, (CalfValue *) &all_args,
+                                                                               args_count_call);
+                    }
+                        break;
+
+                    default: {
+                        return calf_exec_raise_error(script, func->name, "Type '%.*s' can't be called",
+                                                     calf_value_type_to_str(func_to_call));
+                    }
+
                 }
 
                 PUSH(func_result);
@@ -1271,14 +1280,32 @@ static CalfValue calf_execute_op(CalfScript *script, CalfExec *exec, CalfFunc *f
 
                 CalfValue value = POP_GET();
 
-                if (value.type == CALF_VALUE_TYPE_USER_OBJ) {
-                    CalfUserObject *user_object = value.user_object_value;
-                    ((CalfGetAttrFunc) user_object->get_attr)(script, attr_name_to_load);
-                } else if (value.type == CALF_VALUE_TYPE_OBJ) {
+                switch (value.type) {
 
-                } else {
-                    calf_exec_raise_error(script, func->name, "Can't get attribute on type '%.*s'",
-                                          calf_value_type_to_str(value));
+                    case CALF_VALUE_TYPE_USER_OBJ: {
+                        CalfUserObject *user_object = value.user_object_value;
+                        CalfGetAttrFunc get_attr_func = user_object->get_attr;
+                        if (get_attr_func != NULL) {
+                            CalfValue get_attr_value = get_attr_func(script, user_object, attr_name_to_load);
+                            if (calf_value_is_error(get_attr_value)) {
+                                return get_attr_value;
+                            } else {
+                                PUSH(get_attr_value);
+                            }
+                        } else {
+                            return calf_value_from_error("Use object doesn't support get_attr");
+                        }
+                    }
+                        break;
+
+                    case CALF_VALUE_TYPE_OBJ: {
+                    }
+                        break;
+
+
+                    default:
+                        return calf_exec_raise_error(script, func->name, "Can't get attribute on type '%.*s'",
+                                                     calf_value_type_to_str(value));
                 }
             }
                 break;
@@ -1292,7 +1319,7 @@ static CalfValue calf_execute_op(CalfScript *script, CalfExec *exec, CalfFunc *f
 
                 if (value.type == CALF_VALUE_TYPE_USER_OBJ) {
                     CalfUserObject *user_object = value.user_object_value;
-                    ((CalfSetAttrFunc) user_object->set_attr)(script, attr_name_to_load, value);
+                    ((CalfSetAttrFunc) user_object->set_attr)(script, user_object, attr_name_to_load, value);
                 } else if (value.type == CALF_VALUE_TYPE_OBJ) {
 
                 } else {
@@ -1306,8 +1333,11 @@ static CalfValue calf_execute_op(CalfScript *script, CalfExec *exec, CalfFunc *f
             case CALF_OP_LOAD_NAME: {
                 char *name_to_load = script->strings_array.data[*(++opcode)];
                 CalfValue *load_value;
+                //check in the module first
                 if (calf_map_get(&func->module->globals, name_to_load, strlen(name_to_load),
                                  (uintptr_t *) &load_value)) {
+                } else if (calf_map_get(&script->globals, name_to_load, strlen(name_to_load),
+                                        (uintptr_t *) &load_value)) {
                 } else {
                     return calf_exec_raise_error(script, func->name, "Name '%.*s' not found", name_to_load);
                 }

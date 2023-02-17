@@ -98,6 +98,7 @@ typedef struct {
 } CalfFunc;
 
 typedef struct {
+    int type;
     void *obj;
     void *get_attr;
     void *set_attr;
@@ -118,10 +119,11 @@ typedef struct {
 
 } CalfValue;
 
-typedef CalfValue (*CalfGetAttrFunc)(CalfScript *, char *attr_name);
+typedef CalfValue (*CalfGetAttrFunc)(CalfScript *, CalfUserObject *, char *attr_name);
 
-typedef CalfValue (*CalfSetAttrFunc)(CalfScript *, char *attr_name, CalfValue value);
+typedef CalfValue (*CalfSetAttrFunc)(CalfScript *, CalfUserObject *, char *, CalfValue);
 
+//First argument is the script, the second is a list of the arguments and third is argument length
 typedef CalfValue (*CalfFuncCall)(CalfScript *, CalfValue *, int);
 
 
@@ -135,7 +137,7 @@ typedef CalfValue (*CalfFuncCall)(CalfScript *, CalfValue *, int);
  *  VALUE API
  */
 
-typedef CalfValue (CalfInterfaceFunc)(CalfValue *, int);
+typedef CalfValue (CalfInterfaceFunc)(CalfScript *, CalfValue *, int);
 
 static CalfValue calf_value_none() {
     CalfValue value;
@@ -190,6 +192,13 @@ static CalfValue calf_value_from_interface_function(CalfInterfaceFunc func) {
     CalfValue value;
     value.type = CALF_VALUE_TYPE_C_FUNC;
     value.func_value = (CalfFunc *) func;
+    return value;
+}
+
+static CalfValue calf_value_from_error(char *error) {
+    CalfValue value;
+    value.type = CALF_VALUE_TYPE_ERROR;
+    value.error = error;
     return value;
 }
 
@@ -286,6 +295,10 @@ static bool calf_value_is_user_obj(CalfValue value) {
     return value.type == CALF_VALUE_TYPE_USER_OBJ;
 }
 
+static bool calf_value_is_error(CalfValue value) {
+    return value.type == CALF_VALUE_TYPE_ERROR;
+}
+
 
 /*
  * Init a CalfScript structure. This called is required before any script can be called.
@@ -294,10 +307,14 @@ static bool calf_value_is_user_obj(CalfValue value) {
 bool calf_init(CalfScript *script);
 
 /*
- * Set a user object into the scripts global
+ * Set a value into the scripts global
  */
-void
-calf_script_set_global(CalfScript *script, char *name, void *obj, CalfGetAttrFunc get_attr, CalfSetAttrFunc func);
+void calf_script_set_global(CalfScript *script, char *name, CalfValue value);
+
+/*
+ * Get a value from the scripts global
+ */
+CalfValue calf_script_get_global(CalfScript *script, char *name);
 
 /*
  * Load a module from text.
