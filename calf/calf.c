@@ -677,7 +677,13 @@ static bool calf_parse_expr(CalfParser *parser) {
     float float_value;
     char *str_value;
 
-    if (calf_lex_float(parser, &float_value)) {
+    if (calf_lex_specific(parser, "true")) {
+        byte_writer_int32(&parser->writer, CALF_OP_CONST_TRUE);
+    } else if (calf_lex_specific(parser, "false")) {
+        byte_writer_int32(&parser->writer, CALF_OP_CONST_FALSE);
+    } else if (calf_lex_specific(parser, "none")) {
+        byte_writer_int32(&parser->writer, CALF_OP_CONST_NONE);
+    } else if (calf_lex_float(parser, &float_value)) {
         byte_writer_int32(&parser->writer, CALF_OP_CONST_FLOAT);
         byte_writer_float(&parser->writer, float_value);
         return true;
@@ -984,6 +990,7 @@ bool calf_init(CalfScript *script) {
     calf_map_init(&script->strings_map);
     script->strings_array = (CalfArray) {0};
     script->heap = calf_alloc(CALF_HEAP_SIZE);
+    script->current_heap = script->heap;
     calf_map_init(&script->globals);
     return true;
 }
@@ -1010,6 +1017,15 @@ CalfModule *calf_load_module(CalfScript *script, char *text) {
     calf_map_init(&file->globals);
     calf_parse_file(script, file, text);
     return file;
+}
+
+CalfValue *calf_module_get_global(CalfModule *module, char *name) {
+    CalfValue *found_value;
+    if (calf_map_get(&module->globals, name, strlen(name), (uintptr_t *) &found_value)) {
+        return found_value;
+    }
+
+    return NULL;
 }
 
 typedef struct {
@@ -1179,8 +1195,10 @@ static CalfValue calf_execute_op(CalfScript *script, CalfExec *exec, CalfFunc *f
             case CALF_OP_CONST_NONE: {
                 CalfValue value;
                 value.type = CALF_VALUE_TYPE_NONE;
-                return value;
+                value.int_value = 0;
+                PUSH(value);
             }
+                break;
 
             case CALF_OP_CONST_INT: {
                 CalfValue value;
@@ -1421,6 +1439,10 @@ static CalfValue calf_execute_op(CalfScript *script, CalfExec *exec, CalfFunc *f
                         return calf_exec_raise_error(script, func->name, "'str' can't operate on '%.*s'",
                                                      calf_value_type_to_str(right_value));
                     }
+                } else if (left_value.type == CALF_VALUE_TYPE_NONE || left_value.type == CALF_VALUE_TYPE_BOOL) {
+                    op_result = calf_int_op(left_value.int_value, right_value.int_value, operation_flag);
+                } else if (left_value.type == CALF_VALUE_TYPE_USER_OBJ && right_value.type == CALF_VALUE_TYPE_NONE) {
+                    op_result = calf_int_op(left_value.int_value, right_value.int_value, operation_flag);
                 } else {
                     return calf_exec_raise_error(script, func->name, "'%.*s' can't be used with an operator",
                                                  calf_value_type_to_str(left_value));

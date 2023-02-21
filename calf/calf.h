@@ -77,6 +77,7 @@ typedef struct {
 
     //heap is allocated during init
     char *heap;
+    char *current_heap;
     int heap_size;
 
     //Error buffer to write the error message
@@ -142,6 +143,7 @@ typedef CalfValue (CalfInterfaceFunc)(CalfScript *, CalfValue *, int);
 static CalfValue calf_value_none() {
     CalfValue value;
     value.type = CALF_VALUE_TYPE_NONE;
+    value.int_value = 0;
     return value;
 }
 
@@ -295,6 +297,10 @@ static bool calf_value_is_user_obj(CalfValue value) {
     return value.type == CALF_VALUE_TYPE_USER_OBJ;
 }
 
+static bool calf_value_is_user_obj_with_type(CalfValue value, int id) {
+    return calf_value_is_user_obj(value) && value.user_object_value->type == id;
+}
+
 static bool calf_value_is_error(CalfValue value) {
     return value.type == CALF_VALUE_TYPE_ERROR;
 }
@@ -305,6 +311,16 @@ static bool calf_value_is_error(CalfValue value) {
  */
 
 bool calf_init(CalfScript *script);
+
+/*
+ * Allocate temporary memory
+ */
+
+static void *calf_script_alloc(CalfScript *script, int size) {
+    void *result = script->current_heap;
+    script->current_heap += size;
+    return result;
+}
 
 /*
  * Set a value into the scripts global
@@ -321,6 +337,12 @@ CalfValue calf_script_get_global(CalfScript *script, char *name);
  */
 
 CalfModule *calf_load_module(CalfScript *script, char *text);
+
+/*
+ * Get a global object from a module
+ */
+
+CalfValue *calf_module_get_global(CalfModule *module, char *name);
 
 /*
  * Api function to call a script function from C. It's NOT to be called internally by the interpreter
